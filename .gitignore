@@ -152,7 +152,7 @@ cython_debug/
 #.idea/
 
 #Visual studio files
-.pyproj
+*.pyproj
 
 #Encrypted Wallet files
-.wlt
+*.wlt
