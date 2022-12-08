@@ -1,4 +1,3 @@
-from pickle import FALSE, TRUE
 from key_loader import prompt_load_wallet
 from IMXlib import eth_get_address, imx_sell_nft, imx_buy_nft, imx_transfer_nft, imx_cancel_order, FEE
 from requests import request
@@ -7,6 +6,19 @@ import json
 import time
 
 def call_retry(function, *args):
+	''' Used for automatically repeating failed network calls. Will wait three seconds to try again if the provided method call returns an error.
+
+	Parameters
+	----------
+	function
+		The function that should be called.
+	args
+		The arguments to call the function with.
+
+	Returns
+	----------
+	The return value of the function call.
+	'''
 	while True:
 		try:
 			result = function(*args)
@@ -17,6 +29,12 @@ def call_retry(function, *args):
 	return result
 
 def get_eth_price():
+	''' Fetches the current price of ETH in USD.
+
+	Returns
+	----------
+	float : The current price of ETH in USD. 
+	'''
 	return json.loads(call_retry(request, "GET", "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd").content)["ethereum"]["usd"]
 
 def fetch_cards():
