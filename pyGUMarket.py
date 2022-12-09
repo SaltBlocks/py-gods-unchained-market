@@ -73,7 +73,7 @@ def get_token_list():
 		tokens = json.loads(call_retry(request, "GET", "https://api.x.immutable.com/v1/tokens").content)
 		token_list = [["ETH", "ETH"]]
 		for token in tokens["result"]:
-			if "ETH" in token['symbol'] or not "100000000" in token['quantum']:
+			if "ETH" in token['symbol']:
 				continue
 			token_list.append([token['symbol'], token["token_address"]])
 	return token_list
