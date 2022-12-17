@@ -267,23 +267,22 @@ def c_to_string(c_var):
 	return c_char_p.from_address(addressof(c_var)).value.decode()
 
 def main():
-	from keys import TEST_WALLET
-	eth_key = TEST_WALLET
+	eth_key = eth_generate_key()
 	address = eth_get_address(eth_key)
 	print(f"ADDRESS: {hex(address)}")
 
-	nft_address = 0xacb3c6a43d15b907e8433077b6d38ae40936fe2c
-	nft_id = 209512341
+	#nft_address = 0xacb3c6a43d15b907e8433077b6d38ae40936fe2c
+	#nft_id = 209512341
 	#price = 1
 	#fee = FEE(b"0x216df17ec98bae6047f2c5466162333f1aee23dc", 25)
 	#print(imx_sell_nft(nft_address, nft_id, "ETH", price, [fee], eth_key))
 	
-	amount = 0.0000001
-	receiver = 0x926268e740a64d9efa377a26553fd522dc70c053
+	#amount = 0.0000001
+	#receiver = 0x926268e740a64d9efa377a26553fd522dc70c053
 	#print(imx_tranfer_token("ETH", amount, receiver, eth_key))
 	#print(imx_transfer_nft(nft_address, nft_id, receiver, eth_key))
-	print(imx_get_token_trade_fee(nft_address, nft_id))
-	print(imx_register_address(eth_generate_key()))
+	#print(imx_get_token_trade_fee(nft_address, nft_id))
+	#print(imx_register_address(eth_generate_key()))
 	#order_id = 244755386
 	#print(imx_cancel_order(order_id, eth_key))
 
