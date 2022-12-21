@@ -130,7 +130,9 @@ def prompt_load_wallet():
 		if os.path.isfile(file_name) and file_name.endswith(".wlt"):
 			wallets.append(file_name)
 	for i in range(len(wallets)):
-		print(f"{i + 1}. {hex(load_wallet_address(wallets[i]))}")
+		name = wallets[i][:-4]
+		address = str(hex(load_wallet_address(wallets[i])))
+		print(f"{i + 1}. {name} ({address[0:6]}...{address[-4:]})")
 	print(f"{len(wallets) + 1}. Add new wallet.")
 
 	while True:

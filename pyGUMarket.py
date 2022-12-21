@@ -219,7 +219,7 @@ def buy_card(card, eth_priv : int):
 	url = f"https://api.x.immutable.com/v1/orders?buy_token_address={token_str}&direction=asc&include_fees=true&order_by=buy_quantity&page_size=200&sell_metadata={card_data}&sell_token_address=0xacb3c6a43d15b907e8433077b6d38ae40936fe2c&status=active"
 	cards_on_sale = json.loads(call_retry(request, "GET", url).content)["result"]
 	
-	fees = []#[FEE(b"0x926268e740a64d9efa377a26553fd522dc70c053", 10)]
+	fees = []
 
 	offers = []
 	for offer in cards_on_sale:
@@ -257,25 +257,46 @@ def sell_card(card_data, eth_priv : int):
 	'''
 	nft_address = card_data["token_address"]
 	nft_id = card_data["token_id"]
-	trade_fee = imx_get_token_trade_fee(nft_address, nft_id)
+	trade_fee = imx_get_token_trade_fee(nft_address, nft_id) # Get the base trade fee percentage that will be added to the user sale price.
 
-	try:
+	try: # Request the user to select the currency to sell the card for.
 		print("Select the currency to sell for: ")
 		token = request_token()
 	except (ValueError, IndexError):
 		print("Invalid selection, returning to main menu...")
 		return
 
-	print("Type the price to sell the card for (excluding fees):")
+	print("Type the price to sell the card for (including fees):") # Request the user to provide the price they want their card to be listed at.
 	try:
 		price = float(input())
 	except ValueError:
 		print("Invalid price, returning to main menu...")
 		return
 
-	fees = []#[FEE(str(hex(address)).encode(), 92)]
-	fee_mult = (101 + trade_fee + sum([x[1] for x in fees])) / 100
-	print(f"Sell card '{card_data['name']}' for {price} {token[0]} (list price: {round(price * fee_mult, 10)} {token[0]})? (y/n)")
+	receive_amount = round(price / (101 + trade_fee) * 100 - 0.5 * 10**-8, 8)
+	receive_with_fee = round(price / (200 + trade_fee) * 199 - 0.5 * 10**-8, 8)
+	use_fee = False
+	print("You can reduce the fee paid by the buyer by receiving part of the sale price as a fee.")
+	print(f"Doing so will not change the price for the buyer but will reduce the 'true' fee on this sale from {round(100 * price / receive_amount - 100, 2)}% to {round(100 * price / receive_with_fee - 100, 2)}%")
+	print(f"Choosing yes on this option will increase the amount ot {token[0]} paid out to you on a successful sale from {receive_amount} {token[0]} to {receive_with_fee} {token[0]}.")
+	print("The downside of using this is that fees are not always paid out immediately after the order settles, usually the fee will be paid out within seconds, but in extraordinary cases it could take up to a few hours after the sale for the funds to arrive.")
+	print("Would you like to use this? (y/n)")
+	choice = input()
+	if choice == "y":
+		print(f"The 'true' fee on this order will reduced to {round(100 * price / receive_with_fee - 100, 2)}% (Excludes fees paid out to you.)")
+		use_fee = True
+	else:
+		print(f"The fee on this order will be the standard {round(100 * price / receive_amount - 100, 2)}%")
+
+	fees = []
+	if use_fee:
+		fees = [FEE(str(hex(eth_get_address(eth_priv))).encode(), 99)]
+		receive_amount = receive_with_fee
+	
+	fee_mult = (101 + trade_fee + sum([x.percentage for x in fees])) / 100
+	price = price / fee_mult
+
+	print(f"'{card_data['name']}' will be listed on the market for {round(price * fee_mult, 10)} {token[0]}. If sold, you will recieve {receive_amount} {token[0]}. Would you like to submit this listing? (y/n)")
 	choice = input()
 	
 	if choice == "y":
