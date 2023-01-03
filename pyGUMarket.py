@@ -239,9 +239,42 @@ def buy_card(card, eth_priv : int):
 	best_offer = offers[0]
 	print(f"Buy '{card['name']}' for {best_offer[3]} {token[0]}? (y/n)")
 	choice = input()
-	print(best_offer)
 	if choice == "y":
 		print(f"Order finished with the following server response: {imx_buy_nft(best_offer[0], best_offer[1], best_offer[2], token[1], best_offer[3], fees, eth_priv)}")
+	else:
+		print("Cancelled order, returning to main menu...")
+
+def buy_cosmetic(eth_priv : int):
+	print("No search function for these just yet :(.")
+	print("What is the proto_id of the cosmetic you'd like to buy?")
+	proto = input();
+	url = f"https://api.x.immutable.com/v1/orders?buy_token_type=ETH&direction=asc&include_fees=true&order_by=buy_quantity&page_size=200&sell_metadata=%257B%2522proto%2522%253A%255B%2522{proto}%2522%255D%257D&sell_token_address=0x7c3214ddc55dfd2cac63c02d0b423c29845c03ba&status=active"
+	cosmetics_on_sale = json.loads(call_retry(request, "GET", url).content)["result"]
+	cosmetic_name = cosmetics_on_sale[0]["sell"]["data"]["properties"]["name"]
+	print(f"Buying: {cosmetic_name}")
+	
+	fees = []
+
+	offers = []
+	for offer in cosmetics_on_sale:
+		order_id = offer['order_id']
+		nft_address = offer['sell']['data']['token_address']
+		nft_id = offer['sell']['data']['token_id']
+		quantity = int(offer['buy']['data']['quantity'])
+		quantity_base = quantity
+		for fee in offer['fees']:
+			quantity_base -= int(fee['amount'])
+		quantity += quantity_base * 0.01
+		for fee in fees:
+			quantity += quantity_base * (fee.percentage / 100)
+		price = quantity / 10**18
+		offers.append([order_id, nft_address, nft_id, price])
+	offers.sort(key=lambda x: x[3])
+	best_offer = offers[0]
+	print(f"Buy '{cosmetic_name}' for {best_offer[3]} ETH? (y/n)")
+	choice = input()
+	if choice == "y":
+		print(f"Order finished with the following server response: {imx_buy_nft(best_offer[0], best_offer[1], best_offer[2], 'ETH', best_offer[3], fees, eth_priv)}")
 	else:
 		print("Cancelled order, returning to main menu...")
 
@@ -470,7 +503,7 @@ def main():
 		for currency in balances:
 			print(f"{balances[currency]} {currency}")
 		print("--- Main Menu ---")
-		print("1. Select card to trade\n2. Transfer currency\n3. Export private key\n4. Exit")
+		print("1. Select card to trade\n2. Buy GU Cosmetic\n3. Transfer currency\n4. Export private key\n5. Exit")
 		choice = input()
 		print(choice)
 		if (choice == "1"):
@@ -481,13 +514,15 @@ def main():
 				continue
 			trade_card(card_to_trade, eth_price, address, eth_priv)
 		elif (choice == "2"):
-			transfer_currency(eth_priv)
+			buy_cosmetic(eth_priv)
 		elif (choice == "3"):
+			transfer_currency(eth_priv)
+		elif (choice == "4"):
 			print("This will display the current wallets private key, continue? (y/n)")
 			choice = input()
 			if (choice == "y"):
 				print(f"PRIVATE KEY: {hex(eth_priv)}")
-		elif (choice == "4"):
+		elif (choice == "5"):
 			break
 
 
