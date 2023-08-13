@@ -276,9 +276,6 @@ def finish_signature_request():
 
 def main():
     wallet = imx_web_wallet()
-    #print(wallet.cancel_order(317933507))
-    print(wallet.transfer_token("ETH", 0.000001, "0xA11738D1eD318FB27b2D37ab96AdF0eAb72b5ff4"))
-    #print(wallet.sell_nft("0xacb3c6a43d15b907e8433077b6d38ae40936fe2c", "182567518", "ETH", 5, []))
     input()
     http_server.shutdown()
 
