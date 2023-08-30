@@ -7,7 +7,7 @@ Functions for interacting with Immutable X are implemented in IMXlib.py and used
 '''
 
 from key_loader import prompt_load_wallet
-from IMXlib import imx_get_token_trade_fee
+from IMXlib import imx_get_token_trade_fee, FEE, vcredist_installed
 from requests import request
 from urllib.parse import quote
 from imx_wallet import imx_wallet, imx_web_wallet, shutdown_server
@@ -186,13 +186,17 @@ def buy_card(card, wallet: imx_wallet):
     cards_on_sale = json.loads(call_retry(request, "GET", url).content)["result"]
 
     fees = []
+    #fees = [FEE(str(hex(wallet.get_address())).encode(), 0.1)] #example of an added 0.1% fee. Transferred to the sellers wallet.
 
+    fee_added_multiplier = 0.01
+    for fee in fees:
+        fee_added_multiplier += fee.percentage / 100
     offers = []
     for offer in cards_on_sale:
         order_id = offer['order_id']
         quantity = int(offer['buy']['data']['quantity'])
         quantity_with_fees = int(offer['buy']['data']['quantity_with_fees'])
-        quantity_total = (quantity_with_fees + quantity * 0.01) / 10**18
+        quantity_total = (quantity_with_fees + quantity * fee_added_multiplier) / 10**18
         offers.append([order_id, quantity_total])
     offers.sort(key=lambda x: x[1])
     best_offer = offers[0]
@@ -265,12 +269,14 @@ def sell_card(card_data, wallet : imx_wallet):
         print("Invalid price, returning to main menu...")
         return
 
-
-    price_base = price / (100 + trade_fee) * 100
-    amount_receive = price / (100 + trade_fee) * 100 * 0.99
-
     fees = []
-    # fees = [FEE(str(hex(eth_get_address(eth_priv))).encode(), 1)] example of an added 1% fee.
+    #fees = [FEE(str(hex(wallet.get_address())).encode(), 0.1)] #example of an added 0.1% fee. Transferred to the sellers wallet.
+    
+    fee_subtracted_multiplier = 0.99
+    for fee in fees:
+        fee_subtracted_multiplier -= fee.percentage / 100
+    price_base = price / (100 + trade_fee) * 100
+    amount_receive = price / (100 + trade_fee) * 100 * fee_subtracted_multiplier
     
     print(f"'{card_data['name']}' will be listed on the market for {round(price, 10)} {token[0]}. If sold, you will recieve {amount_receive} {token[0]}. Would you like to submit this listing? (y/n)")
     choice = input()
@@ -431,6 +437,7 @@ def transfer_currency(wallet : imx_wallet):
 def main():
     ''' Show the main menu for trading Gods Unchained cards on Immutable X.
     '''
+
     wallet = prompt_load_wallet()
     if not link_wallet(wallet):
         shutdown_server()

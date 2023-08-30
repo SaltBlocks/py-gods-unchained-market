@@ -2,15 +2,55 @@ from ctypes import CDLL, create_string_buffer, Structure, c_char, c_char_p, c_in
 import platform
 import os
 import json
+import winreg
 
 arch = "Win32"
 
 if "64" in platform.architecture()[0]:
     arch = "x64"
 
+def vcredist_installed():
+    ''' Checks whether or not the Microsoft Visual C++ Redistributable is installed on the system by checking the windows registry.
+        Prompts the user to download and install this is if it is not installed.
+    
+    Returns
+    ----------
+    bool : True if Microsoft Visual C++ Redistributable is installed on the system.
+    '''
+    try:
+        vcredist_key = r"SOFTWARE\Wow6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes"
+        vcredist_download = "https://aka.ms/vs/17/release/vc_redist."
+        if "x64" in arch:
+            vcredist_key += r"\X64"
+            vcredist_download += "x64.exe"
+        else:
+            vcredist_key += r"\X86"
+            vcredist_download += "x86.exe"
+            print(vcredist_key)
+        registry = winreg.ConnectRegistry(None, winreg.HKEY_LOCAL_MACHINE)
+        rawKeyA = winreg.OpenKey(registry, vcredist_key)
+        winreg.CloseKey(rawKeyA)
+        return True
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print("Error:", e)
+    print("This application requires the Microsoft Visual C++ Redistributable to run properly.")
+    print("It seems that this is not currently installed on your system.\n")
+    print("You can find more information and downloads on:")
+    print("https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170")
+    print("\nYou can download and install the latest version for your system directly from:")
+    print(vcredist_download)
+    return False
+
+# Check if the Microsoft Visual C++ Redistributable is installed before trying to load IMXlib.
+if not vcredist_installed():
+    exit()
 dllname = "IMXlib.dll"
 dllpath = os.path.dirname(os.path.abspath(__file__)) + os.path.sep + arch + os.path.sep + dllname
 imx_lib = CDLL(dllpath)
+    
+
 
 '''
 Structures used to pass lists of specific data to IMXlib.
@@ -27,7 +67,7 @@ class FEE(Structure):
         The percentate of the base price that should be added as fee.
     '''
     _fields_ = [("address", c_char * 43), 
-             ("percentage", c_int)]
+             ("percentage", c_double)]
 
 class NFT(Structure):
     ''' Structure for NFTs that can be passed to IMXlib
@@ -322,9 +362,9 @@ def imx_buy_nft(order_id, price : float, fees, eth_key):
 Functions that don't require the ethereum private key to IMXlib.
 These functions can be used to execute trades using a hardware wallet.
 '''
-
+imx_lib.imx_get_token_trade_fee.restype = c_double
 def imx_get_token_trade_fee(nft_address, nft_id):
-    ''' Get the buyer trade fee on a specific asset when trading it on Immutable X (excludes the taker marketplace fee, usually 1%).
+    ''' Get the buyer trade fee on a specific asset when trading it on Immutable X (excludes the maker/taker marketplace fees, usually 1%).
 
     Parameters
     ----------
@@ -335,13 +375,13 @@ def imx_get_token_trade_fee(nft_address, nft_id):
 
     Returns
     ----------
-    str : The response from the server after attempting to transfer the nft.
+    double : The fee percentage.
     '''
     if isinstance(nft_address, int):
         nft_address = str(hex(nft_address))
     if isinstance(nft_id, int):
         nft_id = str(nft_id)
-    return imx_lib.imx_get_token_trade_fee(nft_address.encode("utf-8"), nft_id.encode("utf-8"), None)
+    return imx_lib.imx_get_token_trade_fee(nft_address.encode("utf-8"), nft_id.encode("utf-8"))
 
 def imx_register_address_presign(eth_address, imx_seed_sig, imx_link_sig):
     ''' Sets up the immutable X key for the provided ethereum private key.
