@@ -4,7 +4,7 @@ A command line Gods Unchained marketplace written in python.\
 Supports buying, selling and transfering GU cards as well as creating new wallets and linking them to the Immutable X platform.
 
 ## Notice
-On september 1st 2023, the old IMX V1 orders API will cease to service requests. Old versions of IMXlib will stop functioning at this time. [py-gods-unchained-market v2.1](https://github.com/SaltBlocks/py-gods-unchained-market/releases/tag/v2.1) is updated to use the new API endpoints and will still work after this date. Older versions however will become unusable at this time.
+On september 1st 2023, the old IMX V1 orders API will cease to service requests. Old versions of IMXlib will stop functioning at this time. [py-gods-unchained-market v2.0](https://github.com/SaltBlocks/py-gods-unchained-market/releases/tag/v2.0) and higher are updated to use the new API endpoints and will still work after this date. Older versions however will become unusable at this time.
 
 ## Installation
 
