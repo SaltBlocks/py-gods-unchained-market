@@ -419,7 +419,7 @@ def trade_card(card, eth_price, wallet : imx_wallet):
     card_metadata = quote('{"proto":["' + str(proto) + '"],"quality":["Meteorite"]}')
     url = f"https://api.x.immutable.com/v1/assets?page_size=10&user={hex(wallet.address)}&metadata={card_metadata}&sell_orders=true"
     card_data = json.loads(call_retry(request, "GET", url).text)
-    url = f"https://api.x.immutable.com/v3/orders?status=active&buy_metadata={card_metadata}&order_by=sell_quantity&direction=desc&user=0x216df17ec98bae6047f2c5466162333f1aee23dc&page_size=200"
+    url = f"https://api.x.immutable.com/v3/orders?status=active&buy_metadata={card_metadata}&order_by=sell_quantity&direction=desc&user={hex(wallet.address)}&page_size=200"
     offer_data = json.loads(call_retry(request, "GET", url).text)
     num_owned = len(card_data["result"])
     copy = "copy" if num_owned == 1 else "copies"
