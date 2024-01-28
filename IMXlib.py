@@ -331,7 +331,7 @@ def imx_transfer_token(token_id, amount: float, receiver_address, eth_key):
     imx_lib.imx_transfer_token(token_id.encode("utf-8"), c_double(amount), receiver_address.encode("utf-8"), eth_key.encode("utf-8"), res, 1000)
     return res.value.decode()
 
-def imx_buy_nft(order_id, price : float, fees, eth_key):
+def imx_buy_order(order_id, price : float, fees, eth_key):
     ''' Buy the order specified on Immutable X (includes a 1% taker marketplace fee by default). Can also be used to accept a buy offer.
 
     Parameters
@@ -354,12 +354,12 @@ def imx_buy_nft(order_id, price : float, fees, eth_key):
         eth_key = str(hex(eth_key))
     if isinstance(order_id, int):
         order_id = str(order_id)
-    imx_lib.imx_buy_nft(order_id.encode("utf-8"), c_double(price), 
+    imx_lib.imx_buy_order(order_id.encode("utf-8"), c_double(price), 
                       (FEE * len(fees))(*fees), len(fees), eth_key.encode("utf-8"), res, 1000)
     return res.value.decode()
 
 '''
-Functions that don't require the ethereum private key to IMXlib.
+Functions that don't require passing the ethereum private key to IMXlib.
 These functions can be used to execute trades using a hardware wallet.
 '''
 imx_lib.imx_get_token_trade_fee.restype = c_double
@@ -489,6 +489,41 @@ def imx_request_sell_nft(nft_address, nft_id, token_id, price, fees, seller_addr
                       (FEE * len(fees))(*fees), len(fees), seller_address.encode("utf-8"), res, 1000)
     return res.value.decode()
 
+def imx_request_offer_nft(nft_address, nft_id, token_id, price, fees, buyer_address):
+    ''' Requests a signable sell order for an nft on the Immutable X marketplace
+
+    Parameters
+    ----------
+    nft_address : int
+        The address of the collection the nft is part of. Can also be provided as a hex string (0x......).
+    nft_id : int
+        The id of the nft to create an offer for.
+    token_id : str
+        The id of the token for which to sell the nft (or "ETH" for ethereum).
+    price : float
+        The price you are willing to spend (this includes the 1% maker fee and any user added fees).
+    fees : array
+        An array of fees to add to the sale.
+    buyer_address : int
+        The address of the wallet that owns the nft to sell. Can also be provided as a hex string (0x......).
+
+    Returns
+    ----------
+    str : The response from the server. If the request succeeded, this will contain a nonce and a message that needs to be signed to submit the offer.
+    '''
+    res = create_string_buffer(1000)
+    if isinstance(nft_address, int):
+        nft_address = str(hex(nft_address))
+    if isinstance(nft_id, int):
+        nft_id = str(nft_id)
+    if isinstance(token_id, int):
+        token_id = str(hex(token_id))
+    if isinstance(buyer_address, int):
+        buyer_address = str(hex(buyer_address))
+    imx_lib.imx_request_offer_nft(nft_address.encode("utf-8"), nft_id.encode("utf-8"), token_id.encode("utf-8"), c_double(price), 
+                      (FEE * len(fees))(*fees), len(fees), buyer_address.encode("utf-8"), res, 1000)
+    return res.value.decode()
+
 def imx_finish_sell_or_offer_nft(nonce, imx_seed_sig, imx_transaction_sig):
     ''' Submit a previously signed sell/offer order for an nft to the Immutable X marketplace
 
@@ -515,7 +550,7 @@ def imx_finish_sell_or_offer_nft(nonce, imx_seed_sig, imx_transaction_sig):
     imx_lib.imx_finish_sell_or_offer_nft(nonce.encode("utf-8"), imx_seed_sig.encode("utf-8"), imx_transaction_sig.encode("utf-8"), res, 1000)
     return res.value.decode()
 
-def imx_request_buy_nft(order_id, eth_address, fees):
+def imx_request_buy_order(order_id, eth_address, fees):
     ''' Requests a signable buy order for an order on the Immutable X marketplace. Can also be used to accept a buy offer.
 
     Parameters
@@ -536,22 +571,22 @@ def imx_request_buy_nft(order_id, eth_address, fees):
         eth_address = str(hex(eth_address))
     if isinstance(order_id, int):
         order_id = str(order_id)
-    imx_lib.imx_request_buy_nft(order_id.encode("utf-8"), eth_address.encode("utf-8"), (FEE * len(fees))(*fees), len(fees), res, 1000)
+    imx_lib.imx_request_buy_order(order_id.encode("utf-8"), eth_address.encode("utf-8"), (FEE * len(fees))(*fees), len(fees), res, 1000)
     return res.value.decode()
 
-def imx_finish_buy_nft(nonce, price_limit: float, imx_seed_sig, imx_transaction_sig):
+def imx_finish_buy_order(nonce, price_limit: float, imx_seed_sig, imx_transaction_sig):
     ''' Submit a previously signed buy order to the Immutable X marketplace. Can also be used to accept a buy offer.
 
     Parameters
     ----------
     nonce : int
-        The nonce of the order to submit, this is returned by imx_request_buy_nft.
+        The nonce of the order to submit, this is returned by imx_request_buy_order.
     price_limit : float
         Maximum amount to spend buying the order.
     imx_seed_sig : int
         The signature of the message imx_seed_msg ("Only sign this request ...") signed by the users ETH wallet.
     imx_transaction_sig : int
-        The signature of the message returned by the imx_request_buy_nft method signed by the users ETH wallet.
+        The signature of the message returned by the imx_request_buy_order method signed by the users ETH wallet.
 
     Returns
     ----------
@@ -564,7 +599,7 @@ def imx_finish_buy_nft(nonce, price_limit: float, imx_seed_sig, imx_transaction_
         imx_seed_sig = str(hex(imx_seed_sig))
     if isinstance(imx_transaction_sig, int):
         imx_transaction_sig = str(hex(imx_transaction_sig))
-    imx_lib.imx_finish_buy_nft(nonce.encode("utf-8"), c_double(price_limit), imx_seed_sig.encode("utf-8"), imx_transaction_sig.encode("utf-8"), res, 1000)
+    imx_lib.imx_finish_buy_order(nonce.encode("utf-8"), c_double(price_limit), imx_seed_sig.encode("utf-8"), imx_transaction_sig.encode("utf-8"), res, 1000)
     return res.value.decode()
 
 def imx_request_transfer_nft(nft_address, nft_id, receiver_address, sender_address):

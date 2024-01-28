@@ -182,9 +182,7 @@ def buy_card(card, wallet: imx_wallet):
     if token_str == "ETH":
         token_str = "&buy_token_type=ETH"
     url = f"https://api.x.immutable.com/v3/orders?buy_token_address={token_str}&direction=asc&include_fees=true&order_by=buy_quantity&page_size=200&sell_metadata={card_data}&sell_token_address=0xacb3c6a43d15b907e8433077b6d38ae40936fe2c&status=active"
-    print(url)
     cards_on_sale = json.loads(call_retry(request, "GET", url).content)["result"]
-
     fees = []
     #fees = [FEE(str(hex(wallet.get_address())).encode(), 0.1)] #example of an added 0.1% fee. Transferred to the sellers wallet.
 
@@ -194,18 +192,31 @@ def buy_card(card, wallet: imx_wallet):
     offers = []
     for offer in cards_on_sale:
         order_id = offer['order_id']
+        token_id = offer['sell']['data']['token_id']
+        token_address = offer['sell']['data']['token_address']
         quantity = int(offer['buy']['data']['quantity'])
+        decimals = int(offer['buy']['data']['decimals'])
         quantity_with_fees = int(offer['buy']['data']['quantity_with_fees'])
-        quantity_total = (quantity_with_fees + quantity * fee_added_multiplier) / 10**18
-        offers.append([order_id, quantity_total])
+        quantity_total = (quantity_with_fees + quantity * fee_added_multiplier) / 10**decimals
+        offers.append([order_id, quantity_total, token_id, token_address])
     offers.sort(key=lambda x: x[1])
     best_offer = offers[0]
-    print(f"Buy '{card['name']}' for {best_offer[1]} {token[0]}? (y/n)")
+    print(f"'{card['name']}' is available for {best_offer[1]:.10f} {token[0]}.")
+    print(f"1. Buy now.")
+    print(f"2. Create buy offer.")
+    print(f"3. Cancel.")
     choice = input()
-    if choice == "y":
-        print(f"Order finished with the following server response: {wallet.buy_nft(best_offer[0], best_offer[1], fees)}")
+    if choice == "1":
+        print(f"Buy '{card['name']}' for {best_offer[1]:.10f} {token[0]}? (y/n)")
+        choice = input()
+        if choice == "y":
+            print(f"Order finished with the following server response: {wallet.buy_order(best_offer[0], best_offer[1], fees)}")
+        else:
+            print("Cancelled order, returning to main menu...")
+    elif choice == "2":
+        offer_card(best_offer, token, wallet)
     else:
-        print("Cancelled order, returning to main menu...")
+        print("Cancelled order, returning to main menu...")    
 
 def buy_cosmetic(wallet : imx_wallet):
     ''' Prompt the user to buy a cosmetic item for GU.
@@ -234,10 +245,10 @@ def buy_cosmetic(wallet : imx_wallet):
         offers.append([order_id, quantity_total])
     offers.sort(key=lambda x: x[1])
     best_offer = offers[0]
-    print(f"Buy '{cosmetic_name}' for {best_offer[1]} ETH? (y/n)")
+    print(f"Buy '{cosmetic_name}' for {best_offer[1]:.10f} ETH? (y/n)")
     choice = input()
     if choice == "y":
-        print(f"Order finished with the following server response: {wallet.buy_nft(best_offer[0], best_offer[1], fees)}")
+        print(f"Order finished with the following server response: {wallet.buy_order(best_offer[0], best_offer[1], fees)}")
     else:
         print("Cancelled order, returning to main menu...")
 
@@ -278,11 +289,49 @@ def sell_card(card_data, wallet : imx_wallet):
     price_base = price / (100 + trade_fee) * 100
     amount_receive = price / (100 + trade_fee) * 100 * fee_subtracted_multiplier
     
-    print(f"'{card_data['name']}' will be listed on the market for {round(price, 10)} {token[0]}. If sold, you will recieve {amount_receive} {token[0]}. Would you like to submit this listing? (y/n)")
+    print(f"'{card_data['name']}' will be listed on the market for {price:.10f} {token[0]}. If sold, you will recieve {amount_receive:.10f} {token[0]}. Would you like to submit this listing? (y/n)")
     choice = input()
     
     if choice == "y":
         print(f"Order finished with the following server response: {wallet.sell_nft(nft_address, nft_id, token[1], price_base, fees)}")
+    else:
+        print("Cancelled order, returning to main menu...")
+
+def offer_card(card_data, token, wallet : imx_wallet):
+    ''' Prompt the user to create a buy offer for a meteorite copy of the given card.
+
+    Parameters
+    ----------
+    card_data : json
+        The card that you are looking to sell.
+    wallet : imx_wallet
+        The wallet that owns the card.
+    '''
+    nft_address = card_data[3]
+    nft_id = card_data[2]
+    trade_fee = imx_get_token_trade_fee(nft_address, nft_id) + 1 # Get the trade fee percentage that will be added to the user sale price, we'll assume the buyer marketplace charges 1%.
+
+    print("Type the price you are willing to pay (including fees):") # Request the user to provide the price they want their card to be listed at.
+    try:
+        price = float(input())
+    except ValueError:
+        print("Invalid price, returning to main menu...")
+        return
+
+    fees = []
+    #fees = [FEE(str(hex(wallet.get_address())).encode(), 0.1)] #example of an added 0.1% fee. Transferred to the sellers wallet.
+    
+    fee_added_multiplier = 1.01
+    for fee in fees:
+        fee_added_multiplier += fee.percentage / 100
+    price_base = price / fee_added_multiplier
+    amount_receive = price_base - price_base * trade_fee / 100;
+    
+    print(f"An offer will be created which if accepted, will cost you {price:.10f} {token[0]}. If accepted, the seller will recieve {amount_receive:.10f} {token[0]}. Would you like to submit this listing? (y/n)")
+    choice = input()
+    
+    if choice == "y":
+        print(f"Order finished with the following server response: {wallet.offer_nft(nft_address, nft_id, token[1], price_base, fees)}")
     else:
         print("Cancelled order, returning to main menu...")
 
@@ -367,10 +416,11 @@ def trade_card(card, eth_price, wallet : imx_wallet):
     print("-------")
     print(card_text(card, eth_price))
     proto = card['asset_stack_properties']['proto']
-    card_data = quote('{"proto":["' + str(proto) + '"],"quality":["Meteorite"]}')
-    url = f"https://api.x.immutable.com/v1/assets?page_size=10&user={hex(wallet.address)}&metadata={card_data}&sell_orders=true"
-    print(url)
+    card_metadata = quote('{"proto":["' + str(proto) + '"],"quality":["Meteorite"]}')
+    url = f"https://api.x.immutable.com/v1/assets?page_size=10&user={hex(wallet.address)}&metadata={card_metadata}&sell_orders=true"
     card_data = json.loads(call_retry(request, "GET", url).text)
+    url = f"https://api.x.immutable.com/v3/orders?status=active&buy_metadata={card_metadata}&order_by=sell_quantity&direction=desc&user=0x216df17ec98bae6047f2c5466162333f1aee23dc&page_size=200"
+    offer_data = json.loads(call_retry(request, "GET", url).text)
     num_owned = len(card_data["result"])
     copy = "copy" if num_owned == 1 else "copies"
     print(f"You own {num_owned} meteorite {copy} of this card.")
@@ -386,6 +436,9 @@ def trade_card(card, eth_price, wallet : imx_wallet):
                 token = ["???", "???"]
             price = int(sale['buy_quantity']) / 10**int(sale['buy_decimals'])
             print(f"You have this card on sale for {price} {token[0]} (excluding taker market fee)")
+    for offer in offer_data["result"]:
+        order_ids.append(offer["order_id"])
+    print(f"You have {len(offer_data['result'])} outstanding buy offer for this card.")
     print("-------")
     print("1. Buy card.")
     if num_owned > 0:
@@ -427,7 +480,7 @@ def transfer_currency(wallet : imx_wallet):
     except ValueError:
         print("Invalid address entered, returning to main menu...")
         return
-    print(f"Transfer '{amount}' {token[0]} to '{hex(transfer_address)}'? (y/n).")
+    print(f"Transfer '{amount:.10f}' {token[0]} to '{hex(transfer_address)}'? (y/n).")
     choice = input()
     if choice == "y":
         print(f"Transfer finished with the following server response: {wallet.transfer_token(token[1], amount, transfer_address)}")
@@ -443,7 +496,9 @@ def main():
         shutdown_server()
         return
     print(f"Loaded wallet: '{hex(wallet.address)}'")
+    print("Fetching currency prices...")
     eth_price = call_retry(get_eth_price)
+    print("Fetching GU cards...")
     cards = call_retry(fetch_cards)
     
     while True:
@@ -477,8 +532,6 @@ def main():
         elif (choice == "5"):
             break
     shutdown_server()
-
-
 
 if __name__ == "__main__":
     main() # Entry point for the program. Load the main function.

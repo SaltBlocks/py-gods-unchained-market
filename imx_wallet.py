@@ -34,7 +34,10 @@ class imx_wallet:
         balances = json.loads(request("GET", f"https://api.x.immutable.com/v2/balances/{hex(self.address)}").content)
         balance_data = dict()
         for token in balances["result"]:
-            balance_data[token["symbol"]] = int(token["balance"]) / 10**18
+            decimals = 18
+            if token["symbol"] == "USDC":
+                decimals = 6
+            balance_data[token["symbol"]] = int(token["balance"]) / 10**decimals
         return balance_data
 
     def register_address(self):
@@ -52,8 +55,11 @@ class imx_wallet:
     def transfer_token(self, token_id, amount: float, receiver_address):
         return imx_transfer_token(token_id, amount, receiver_address, self.eth_key)
     
-    def buy_nft(self, order_id, price : float, fees):
-        return imx_buy_nft(order_id, price, fees, self.eth_key)
+    def buy_order(self, order_id, price : float, fees):
+        return imx_buy_order(order_id, price, fees, self.eth_key)
+    
+    def offer_nft(self, nft_address, nft_id, token_id, price: float, fees):
+        return imx_offer_nft(nft_address, nft_id, token_id, price, fees, self.eth_key)
 
 class imx_web_wallet(imx_wallet):
     def __init__(self):
@@ -129,15 +135,27 @@ class imx_web_wallet(imx_wallet):
         else:
             raise AssertionError(f"Signed message {result['message']} or address {result['address']} does not match the requested data.")
     
-    def buy_nft(self, order_id, price : float, fees):
-        data = json.loads(imx_request_buy_nft(order_id, self.address, fees))
+    def buy_order(self, order_id, price : float, fees):
+        data = json.loads(imx_request_buy_order(order_id, self.address, fees))
         nonce = data["nonce"]
         request_signature(data["signable_message"], f"Buy order with ID {order_id} for up to '{price}' of the sale token.")
         print(f"Please go to 'http://localhost:{PORT}/' to sign the buy order...")
         result = signature_queue.get()
         finish_signature_request()
         if result["message"] == data["signable_message"] and result["address"] == str(hex(self.address)):
-            return imx_finish_buy_nft(nonce, price, self.imx_seed, result["signature"])
+            return imx_finish_buy_order(nonce, price, self.imx_seed, result["signature"])
+        else:
+            raise AssertionError(f"Signed message {result['message']} or address {result['address']} does not match the requested data.")
+    
+    def offer_nft(self, nft_address, nft_id, token_id, price: float, fees):
+        data = json.loads(imx_request_offer_nft(nft_address, nft_id, token_id, price, fees, self.address))
+        nonce = data["nonce"]
+        request_signature(data["signable_message"], f"Create a buy offer for an NFT with ID {nft_id} and address {nft_address}.")
+        print(f"Please go to 'http://localhost:{PORT}/' to sign the sell order...")
+        result = signature_queue.get()
+        finish_signature_request()
+        if result["message"] == data["signable_message"] and result["address"] == str(hex(self.address)):
+            return imx_finish_sell_or_offer_nft(nonce, self.imx_seed, result["signature"])
         else:
             raise AssertionError(f"Signed message {result['message']} or address {result['address']} does not match the requested data.")
 
