@@ -443,8 +443,11 @@ def trade_card(card, eth_price, wallet : imx_wallet):
     print("1. Buy card.")
     if num_owned > 0:
         print("2. Sell card.\n3. Transfer card.")
-        if len(order_ids) > 0:
-            print("4. Cancel orders.")
+    if len(order_ids) > 0:
+        num = 2
+        if num_owned > 0:
+            num = 4
+        print(f"{num}. Cancel orders.")
     try:
         choice = int(input())
     except ValueError:
@@ -452,7 +455,10 @@ def trade_card(card, eth_price, wallet : imx_wallet):
     if choice == 1:
         buy_card(card, wallet)
     elif choice == 2:
-        sell_card(card_data["result"][0], wallet)
+        if (num_owned > 0):
+            sell_card(card_data["result"][0], wallet)
+        else:
+            cancel_orders(order_ids, wallet)
     elif choice == 3:
         transfer_card(card_data["result"][0], wallet)
     elif choice == 4:
